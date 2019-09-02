@@ -1,0 +1,34 @@
+library(e1071)
+library(caret)
+library(randomForest)
+library(readr)
+data <- read_csv(".../P1.csv")
+
+head(data)
+data$No.ofdayspriortodeparture2 <- ifelse(data$No.ofdayspriortodeparture == 0, 0,1)
+data2<-data[c(1,5,8,6,7)]
+data2$PaymentAmount <- as.numeric(data2$PaymentAmount)
+data2$No.ofAdults <- as.numeric(data2$No.ofAdults)
+data2$No.ofdayspriortodeparture <- as.numeric(data2$No.ofdayspriortodeparture)
+
+data2$No.ofdayspriortodeparture2 = factor(data2$No.ofdayspriortodeparture2, levels = c(0, 1))
+summary(data2)
+plot(data$No.ofdayspriortodeparture2)
+str(data)
+library(caTools)
+set.seed(123)
+split = sample.split(data2$No.ofdayspriortodeparture, SplitRatio = 0.75)
+training_set = subset(data2, split == TRUE)
+test_set = subset(data2, split == FALSE)
+
+mod <- randomForest(No.ofdayspriortodeparture2~.,ntree = 500, data = training_set)
+mod$importance
+mod$importanceSD
+importance(mod)
+varImpPlot(mod)
+
+predict <-predict(mod, newdata = test_set, type='class')
+confusionMatrix(table(predict,test_set$No.ofdayspriortodeparture2))
+
+
+
