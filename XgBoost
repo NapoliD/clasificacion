@@ -1,0 +1,46 @@
+# XGBoost
+# Defino el entorno
+setwd("")
+# Datos
+str(data)
+dataset<-data[c(2,4,7,8,9,11:14,17,19,20,21,28)]
+write.csv(dataset,"dataset.csv")
+
+
+str(dataset)
+# Codificar las variables categóricas como factores
+dataset$sexo <- ifelse(dataset$sexo=='M',1,0)
+dataset$edad.agrupada <- as.numeric(dataset$edad.agrupada)
+dataset$Geography = as.numeric(factor(dataset$Geography,
+                                     levels = c('France', 'Spain', 'Germany'),
+                                     labels = c(1, 2, 3)))
+
+str(dataset)
+# División del conjunto de datos en el conjunto de entrenamiento y el conjunto de prueba
+# install.packages('caTools')
+library(caTools)
+set.seed(123)
+split = sample.split(dataset$prestamo_si_no, SplitRatio = 0.8)
+training_set = subset(dataset, split == TRUE)
+test_set = subset(dataset, split == FALSE)
+str(training_set)
+# Ajuste de XGBoost al conjunto de entrenamiento
+# install.packages('xgboost')
+library(xgboost)
+classifier = xgboost(data = as.matrix(training_set[-14]), label = training_set$prestamo_si_no, nrounds = 20) 
+# label es nuestra variable dependiente
+# nround indica la cantidad de interacciones de entrenamiento
+
+# Predecir los resultados del conjunto de pruebas
+y_pred = predict(classifier, newdata = as.matrix(test_set[-14]))
+ver<-cbind(test_set,y_pred)
+
+# Verificar el corte 
+y_pred2 = ifelse(y_pred >= 0.50,1,0)
+str(test_set)
+# matriz de confusión
+confusionMatrix(table(y_pred2,test_set$prestamo_si_no))
+# o la clásica
+cm = table(test_set[, 14], y_pred2)
+accuracy = (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] + cm[1,2] + cm[2,1])
+accuracy
