@@ -1,0 +1,151 @@
+library(tidyverse)
+library(e1071)
+library(randomForest)
+library(caret)
+library(readr)
+library(DBI)
+library(utf8)
+#library(lubridate)
+library(ROSE)
+# Comportamiento Junio
+
+setwd("C://Users//l0304611//Downloads")
+Junio_comportamiento_mayorista <-read_csv("query_result (12).csv", 
+                                          col_types = cols(fecha = col_date(format = "%Y-%m-%d")))
+
+setwd("C://Users//l0304611//Downloads")
+MAYO_comportamiento_mayorista <-read_csv("query_result (13).csv", 
+                                         col_types = cols(fecha = col_date(format = "%Y-%m-%d")))
+
+
+str(Junio_comportamiento_mayorista)
+# Prestamo Septiembre
+setwd("C://Users//l0304611//Desktop//MACHINE_LEARNING//XGBoost//DATOS")
+prestamo_si_JULIO <-read_csv("prestamo_si_JULIO.csv", 
+                             col_types = cols(Cantidad = col_skip(), 
+                                              X1 = col_skip()))
+
+setwd("C://Users//l0304611//Desktop//MACHINE_LEARNING//XGBoost//DATOS")
+prestamo_si_JUNIO_mayorista <-read_csv("prestamo_si_JUNIO_mayorista.csv", 
+                                       col_types = cols(Cantidad = col_skip(), 
+                                                        X1 = col_skip()))
+# Comportamiento Mayo
+names (prestamo_si_JUNIO_mayorista)[4] = "party_id"
+names (prestamo_si_JULIO)[4] = "party_id"
+names (Junio_comportamiento_mayorista)[1] = "party_id"
+names (MAYO_comportamiento_mayorista)[1] = "party_id"
+
+# Prestamo Junio
+
+TARGET_JULIO_MAYORISTA<-left_join(Junio_comportamiento_mayorista,prestamo_si_JULIO,.,by="party_id")
+TARGET_Mayo_MAYORISTA<-left_join(MAYO_comportamiento_mayorista,prestamo_si_JUNIO_mayorista,.,by="party_id")
+str(TARGET_JULIO_MAYORISTA)
+TARGET_JULIO_MAYORISTA<-TARGET_JULIO_MAYORISTA[c(1:76)]
+BASE_A_ENTRENAR_JUNIO_JUNIO<-rbind(TARGET_JULIO_MAYORISTA,TARGET_Mayo_MAYORISTA)
+
+BASE_A_ENTRENAR_JUNIO_JUNIO %>% count(BASE_A_ENTRENAR_JUNIO_JUNIO$monto_disp_prest_financieros>1)
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2<-BASE_A_ENTRENAR_JUNIO_JUNIO %>% filter(BASE_A_ENTRENAR_JUNIO_JUNIO$monto_disp_prest_financieros>1)
+
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2$Monto_Total<-ifelse(is.na(BASE_A_ENTRENAR_JUNIO_JUNIO2$Monto_Total),0,BASE_A_ENTRENAR_JUNIO_JUNIO2$Monto_Total)
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2$PRESTAMO_SI_NO<-ifelse(BASE_A_ENTRENAR_JUNIO_JUNIO2$Monto_Total>0,1,0)
+BASE_A_ENTRENAR_JUNIO_JUNIO2 %>% count(BASE_A_ENTRENAR_JUNIO_JUNIO2$PRESTAMO_SI_NO)
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2<-BASE_A_ENTRENAR_JUNIO_JUNIO2 %>% distinct(party_id,.keep_all = TRUE)
+
+#Control 1
+BASE_A_ENTRENAR_JUNIO_JUNIO2 %>% count(BASE_A_ENTRENAR_JUNIO_JUNIO2$PRESTAMO_SI_NO)
+BASE_A_ENTRENAR_JUNIO_JUNIO2 %>% count(BASE_A_ENTRENAR_JUNIO_JUNIO2$fecha)
+BASE_A_ENTRENAR_JUNIO_JUNIO2 %>% count(BASE_A_ENTRENAR_JUNIO_JUNIO2$Loan_Fecha_Coloc)
+BASE_A_ENTRENAR_JUNIO_JUNIO2 %>% count(BASE_A_ENTRENAR_JUNIO_JUNIO2$calificacion_veraz)
+
+
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2$calificacion_veraz = as.numeric(factor(BASE_A_ENTRENAR_JUNIO_JUNIO2$calificacion_veraz,
+                                                          levels = c('Aprobar', 'Aprobar_controlar','consultar','Consultar','Consultar_controlar','Rechazar','Rechazar_controlar'),
+                                                          labels = c(1, 2, 3, 3, 4, 5, 6)))
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2$calificacion_veraz<-ifelse(is.na(BASE_A_ENTRENAR_JUNIO_JUNIO2$calificacion_veraz),0,BASE_A_ENTRENAR_JUNIO_JUNIO2$calificacion_veraz)
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2$segmento = as.numeric(factor(BASE_A_ENTRENAR_JUNIO_JUNIO2$segmento,
+                                                levels = c('NEGOCIOS Y PROFESIONALES GOLD', 'NEGOCIOS Y PROFESIONALES', 'Agro Pes', 'Agro Grandes', 'PYME Micro','PYME PES'),
+                                                labels = c(1, 2, 3, 4, 5, 6)))
+
+BASE_A_ENTRENAR_JUNIO_JUNIO2$segmento<-ifelse(is.na(BASE_A_ENTRENAR_JUNIO_JUNIO2$segmento),0,BASE_A_ENTRENAR_JUNIO_JUNIO2$segmento)
+
+str(BASE_A_ENTRENAR_JUNIO_JUNIO2)
+
+Prestamo_mayorista_julio<-BASE_A_ENTRENAR_JUNIO_JUNIO2[c(2,3,6:42,44,48,53:59,61:63,65,66,77)]
+
+str(Prestamo_mayorista_julio)
+
+Prestamo_mayorista_julio %>%
+  count(Prestamo_mayorista_julio$PRESTAMO_SI_NO)
+
+# NIVELAMOS
+
+Prestamo_si_JUNIO_JULIO_entrena<-Prestamo_mayorista_julio %>% filter(Prestamo_mayorista_julio$PRESTAMO_SI_NO==1)
+Prestamo_no_JUNIO_JULIO_entrena<-head(Prestamo_mayorista_julio %>% filter(Prestamo_mayorista_julio$PRESTAMO_SI_NO==0),1400)
+entrena_final_junio_julio_mayorista <-rbind(Prestamo_si_JUNIO_JULIO_entrena,Prestamo_no_JUNIO_JULIO_entrena)
+
+#  training_set / test_set
+library(caTools)
+set.seed(123)
+split = sample.split(entrena_final_junio_julio_mayorista$PRESTAMO_SI_NO, SplitRatio = 0.7)
+training_set = subset(entrena_final_junio_julio_mayorista, split == TRUE)
+test_set = subset(entrena_final_junio_julio_mayorista, split == FALSE)
+str(training_set)
+
+library(xgboost)
+classifier = xgboost(data = as.matrix(training_set[-54]), label = training_set$PRESTAMO_SI_NO, nrounds = 20)
+
+mod <- randomForest(PRESTAMO_SI_NO~.,ntree = 500, data = training_set)
+importance(mod)
+varImpPlot(mod)
+
+# Aplicamos predictor
+
+y_pred = predict(classifier, newdata = as.matrix(test_set[-54]))
+ver<-cbind(test_set,y_pred)
+
+library(ROSE)
+roc.curve(test_set$PRESTAMO_SI_NO,y_pred)
+y_pred2 = ifelse(y_pred >= 0.50,1,0)
+
+confusionMatrix(table(y_pred2,test_set$PRESTAMO_SI_NO))
+
+
+setwd("C://Users//l0304611//Desktop//MACHINE_LEARNING//XGBoost")
+#classifier<-readRDS(file = "./_The_best_modelo_prestamos_mayorista_junio_julio.rds")
+saveRDS(classifier, file = "./_The_best_modelo_prestamos_mayorista_junio_julio.rds")
+
+
+######## Aplicamos Modelo
+
+
+setwd("C://Users//l0304611//Desktop//MACHINE_LEARNING//XGBoost")
+classifier<-readRDS(file = "./_The_best_modelo_prestamos_mayorista_junio_julio.rds")
+
+library(caTools)
+set.seed(123)
+split = sample.split(TARGET_SEP_MAYORISTA$PRESTAMO_SI_NO, SplitRatio = 0.7)
+training_set = subset(TARGET_SEP_MAYORISTA, split == TRUE)
+test_set = subset(TARGET_SEP_MAYORISTA, split == FALSE)
+str(training_set)
+summary(training_set)
+
+y_pred_SEP_MAYORISTA = predict(classifier, newdata = as.matrix(test_set[-54]))
+
+library(ROSE)
+roc.curve(test_set$PRESTAMO_SI_NO,y_pred_SEP_MAYORISTA)
+
+y_pred2 = ifelse(y_pred_SEP_MAYORISTA >= 0.50,1,0)
+confusionMatrix(table(y_pred2,test_set$PRESTAMO_SI_NO))
+
+library(SHAPforxgboost)
+# To prepare the long-format data:
+shap_long <- shap.prep(xgb_model = classifier, X_train = as.matrix(training_set[-54]),top_n = 5)
+# **SHAP summary plot**
+shap.plot.summary(shap_long)
