@@ -1,0 +1,73 @@
+# BIBLIOTECAS ####
+library(tidyverse)
+library(e1071)
+library(randomForest)
+library(caret)
+library(readr)
+library(DBI)
+library(utf8)
+library(readr)
+library(ROSE)
+library(SHAPforxgboost)
+library(ROSE)
+
+
+setwd("
+
+#Agrupo bases
+Base_comp_Sep_entrena<-rbind(Seguros_si_Sep_Comportamiento_ago_19,Seguros_no_Sep_Comportamiento_ago_19)
+#Armo indicadores
+# Normalizar data ####
+
+Base_comp_Sep_entrena$sexo2 = as.numeric(factor(Base_comp_Sep_entrena$sexo,
+                                                          levels = c('F', 'M'),
+                                                          labels = c(2, 1)))
+
+Base_comp_Sep_entrena%>%
+  count(Base_comp_Sep_entrena$sexo2)
+
+# training_set - test_set #### 
+
+library(caTools)
+set.seed(123)
+split = sample.split(Base_comp_Sep_entrena2$SEGPO_Prima_si, SplitRatio = 0.7)
+training_set = subset(Base_comp_Sep_entrena2, split == TRUE)
+test_set = subset(Base_comp_Sep_entrena2, split == FALSE)
+str(training_set)
+
+
+# ENTRENAMIENTO MODELO ####
+
+library(xgboost)
+classifier = xgboost(data = as.matrix(training_set[-]), label = training_set$SEGPO_Prima_si, nrounds = 20)
+
+summary(training_set)
+
+mod <- randomForest(SEGPO_Prima_si~.,ntree = 500, data = training_set)
+
+varImpPlot(mod)
+
+
+# Aplicamos predictor ####
+
+
+y_pred = predict(classifier, newdata = as.matrix(test_set[-]))
+
+roc.curve(test_set$SEGPO_Prima_si,y_pred)
+y_pred1 = ifelse(y_pred >= 0.50,1,0)
+confusionMatrix(table(y_pred1,test_set$SEGPO_Prima_si))
+
+
+saveRDS(classifier, file = "./_The_best_modelo_seguro_hogar.rds")
+classifier<-readRDS(file = "./_The_best_modelo_seguro_hogar.rds")
+
+
+
+# To prepare the long-format data:
+shap_long <- shap.prep(xgb_model = classifier, X_train = as.matrix(test_set[-]),top_n = 15)
+# **SHAP summary plot**
+shap.plot.summary(shap_long)
+
+
+
+
