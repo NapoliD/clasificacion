@@ -1,0 +1,48 @@
+library(tidyverse)
+library(e1071)
+library(randomForest)
+library(caret)
+library(readr)
+library(DBI)
+library(utf8)
+library(readr)
+library(ROSE)
+
+# Normalizar data ####
+
+Base_comp_Sep_entrena$ = as.numeric(factor(Base_comp_Sep_entrena$,
+                                                          levels = c('', ''),
+                                                          labels = c(2, 1)))
+                                                          
+                                                          library(caTools)
+set.seed(123)
+split = sample.split(Base_comp_Sep_entrena2$SEG_Prima_si, SplitRatio = 0.7)
+training_set = subset(Base_comp_Sep_entrena2, split == TRUE)
+test_set = subset(Base_comp_Sep_entrena2, split == FALSE)
+str(training_set)
+
+library(xgboost)
+mod <- randomForest(SEG_Prima_si~.,ntree = 500, data = training_set)
+varImpPlot(mod)
+
+classifier = xgboost(data = as.matrix(training_set[-]), label = training_set$SEG_Prima_si, nrounds = 20)
+y_pred = predict(classifier, newdata = as.matrix(test_set[-]))
+
+library(ROSE)
+roc.curve(test_set$SEGPO_Prima_si,y_pred)
+
+y_pred1 = ifelse(y_pred >= 0.50,1,0)
+confusionMatrix(table(y_pred1,test_set$SEGPO_Prima_si))
+
+
+setwd("")
+#classifier<-readRDS(file = "./_The_best_modelo_seguro_.rds")
+saveRDS(classifier, file = "./_The_best_modelo_seguro_.rds")
+
+library(SHAPforxgboost)
+# To prepare the long-format data:
+shap_long <- shap.prep(xgb_model = classifier, X_train = as.matrix(test_set[-]),top_n = 15)
+# **SHAP summary plot**
+shap.plot.summary(shap_long)
+
+
