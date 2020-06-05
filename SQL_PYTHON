@@ -3,7 +3,7 @@ import pandas as pd
  
 udaExec = teradata.UdaExec(appName="Test", version="1.0",logConsole=False) 
 
-session = udaExec.connect(method="odbc", system="DATA1N1",username="l0304611", password="17webpython")
+session = udaExec.connect(method="odbc", system="DATA1N1",username="", password="")
 
 
 sql=(
